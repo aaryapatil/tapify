@@ -11,12 +11,14 @@ import math
 import warnings
 
 import numpy as np
-import nfft
+import finufft
 from scipy import interpolate
 from scipy.fft import fft, fftfreq
 from scipy.signal.windows import dpss
 from astropy import units as u
 from astropy.timeseries.periodograms import LombScargle
+
+from .transform import nudft
 
 
 class MultiTaper():
@@ -221,6 +223,9 @@ class MultiTaper():
         else:
             raise TypeError('``method`` must be a string.')
 
+        if method not in ['dft', 'fft', 'ls']:
+            raise ValueError('``method`` must be one of `dft`, `fft`, `ls`')
+
         x_tapered = self._taper_data(center_data=center_data)
 
         # Even sampling case - Fourier Transform
@@ -261,33 +266,22 @@ class MultiTaper():
                 powerK[ind] = LombScargle(self.t, dat).power(freq,
                                                              method='fast')
 
-        # Uneven sampling case - Fourier Transform
-        elif method == 'dft' or method == 'fft':
-            # FUTURE: Use a finer grid for frequency
-            freq = fftfreq(self.N, self.delta_t)[:self.N//2]
+        # Uneven sampling case - Non-uniform Fourier Transform
+        else:
+            fourier_type = {'dft': nudft, 'fft': finufft.nufft1d1}.get(method)
+
+            # Covert times to range [-pi to pi] for finufft
+            t_scaled = (self.t - self.t[0])*(2*np.pi/self.T_range) - np.pi
+            # FUTURE: Tune the frequency grid
+            n_freq = nyquist_factor*self.N
+            freq = np.arange(n_freq//2)/self.T_range
             powerK = np.zeros((self.K, freq.shape[0]))
-
-            if method == 'fft':
-                fourier_type = nfft.nfft_adjoint
-            elif method == 'dft':
-                fourier_type = nfft.ndft_adjoint
-
-            # Covert times to range [-1/2 to 1/2] for nfft
-            t_scaled = (self.t - self.t[0])*1/self.T_range - 0.5
-
-            # nfft does not allow N to be odd, so N-1 is used instead of odd N
-            if self.N % 2:
-                n_freq = self.N - 1
-            else:
-                n_freq = self.N
 
             for ind, dat in enumerate(x_tapered):
                 # Tapered spectrum estimate using fourier transform
                 f_t = fourier_type(t_scaled, dat, n_freq)
-                powerK[ind] = np.abs(f_t[self.N//2:])**2
+                powerK[ind] = np.abs(f_t[n_freq//2:])**2
                 powerK[ind] *= 1/self.N
-        else:
-            raise ValueError('``method`` must be one of `dft`, `fft`. `ls`')
 
         # Adaptive weighting
         if adaptive_weighting:
@@ -314,23 +308,16 @@ class MultiTaper():
 
         x_tapered = self._taper_data(center_data=center_data)
 
-        if method == 'dft':
-            fourier_type = nfft.ndft_adjoint
-        elif method == 'fft':
-            fourier_type = nfft.nfft_adjoint
+        fourier_type = {'dft': nudft, 'fft': finufft.nufft1d1}.get(method)
 
-        # Time range -1/2 to 1/2 for nfft
-        t_scaled = (self.t - self.t[0])*1/self.T_range - 0.5
+        # Covert times to range [-pi to pi] for finufft
+        t_scaled = (self.t - self.t[0])*(2*np.pi/self.T_range) - np.pi
 
-        # nfft does not allow N to be odd, so N-1 is used instead of odd N
-        if self.N % 2:
-            n_freq = self.N - 1
-        else:
-            n_freq = self.N
+        # FUTURE: Tune the frequency grid
+        n_freq = nyquist_factor*self.N
 
-        # Frequencies for the fourier transform
-        freq = (-(n_freq // 2) + np.arange(n_freq))/self.T_range
-
+        # Frequencies for the fourier transform, and the transform
+        freq = (-(n_freq//2) + np.arange(n_freq))/self.T_range
         spec = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
 
         for ind, dat in enumerate(x_tapered):

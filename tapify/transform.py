@@ -7,12 +7,9 @@ that can be utilised for computing periodograms.
 import numpy as np
 
 
-def ndft(x, f):
+def nudft(x, f, n_modes):
     """
     Non-equispaced discrete Fourier transform.
     """
-    # Length of timeseries
-    N = len(x)
-    # Evaluate frequencies
-    k = -(N // 2) + np.arange(N)
-    return np.dot(f, np.exp(2j * np.pi * k * x[:, np.newaxis]))
+    k = -(n_modes//2) + np.arange(n_modes)
+    return np.dot(f, np.exp(1j*k*x[:, np.newaxis]))

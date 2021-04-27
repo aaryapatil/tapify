@@ -1,8 +1,12 @@
+import os
+
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
 from tapify import MultiTaper
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 @pytest.fixture
