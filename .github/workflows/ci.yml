@@ -3,9 +3,12 @@ name: Run Python Tests
 # Controls when the action will run.
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - finufft
   pull_request:
-    branches: [ main ]
+    branches:
+      - main
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
