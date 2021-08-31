@@ -93,21 +93,22 @@ class MultiTaper():
         if N < 9:
             raise ValueError('``N`` must be greater than 8.')
 
-        if NW < 0.5:
+        if float(NW) < 0.5:
             raise ValueError('``NW`` must be greater than or equal to 0.5')
-        if NW > 500:
-            warnings.warn('NW is greater than 500.')
+        if float(NW) > 500:
+            warnings.warn(UserWarning('NW is greater than 500.'))
 
-        if NW/N > 0.5:
-            warnings.warn('Half-bandwidth parameter (W) is greater than 1/2')
+        if float(NW)/N > 0.5:
+            warnings.warn(UserWarning('Half-bandwidth parameter (W) is '
+                                      'greater than 1/2'))
 
         if K < 1:
             raise ValueError('``K`` must be greater than or equal to 1')
-        if K > 1.5 * 2*NW:
-            warnings.warn('``K`` is greater than 1.5 + 2NW')
+        if K > 1.5 + 2*float(NW):
+            warnings.warn(UserWarning('``K`` is greater than 1.5 + 2NW'))
         if not isinstance(K, int):
-            warnings.warn('K should be an integer value.'
-                          'Float will be rounded to integer.')
+            warnings.warn(UserWarning('K should be an integer value.'
+                          'Float will be rounded to integer.'))
             K = int(K)
 
         return N, NW, K
@@ -129,9 +130,10 @@ class MultiTaper():
 
             # Time sampling
             if delta_t is not None:
-                warnings.warn('``delta_t`` should not be provided when'
-                              '``t`` is given. ``delta_t`` will be asigned'
-                              'using ``t`` instead.')
+                warnings.warn(UserWarning('``delta_t`` should not be provided '
+                                          'when ``t`` is given. ``delta_t`` '
+                                          'will be asigned using ``t`` '
+                                          'instead.'))
             self.delta_t = self.t_range/self.N
 
             # Find out if time samples are equally spaced
@@ -291,13 +293,15 @@ class MultiTaper():
         # Even sampling case - Fourier Transform
         if self.even:
             if method == 'LS':
-                warnings.warn('Lomb-Scargle Periodogram is not appropriate \
-                               for evenly-sampled data. Classical \
-                               Periodogram is used instead.')
+                warnings.warn(UserWarning('Lomb-Scargle Periodogram is not '
+                                          'appropriate for evenly-sampled '
+                                          'data. Classical Periodogram is '
+                                          'used instead.'))
 
             if not nyquist_factor == 1:
-                warnings.warn('Nyquist frequency limit is used for \
-                               evenly-sampled data: ``nyquist_factor`` = 1')
+                warnings.warn(UserWarning('Nyquist frequency limit is used '
+                                          'for evenly-sampled data: '
+                                          '``nyquist_factor`` = 1'))
 
             # Frequencies
             freq = fftfreq(self.N_padded, self.delta_t)
@@ -331,9 +335,11 @@ class MultiTaper():
 
             if ftest:
                 ftest = False
-                warnings.warn('F-test requires complex eigencoefficients'
-                              'which Lomb-Scargle Periodogram does not '
-                              'provide. Use ``fft`` or ``dft`` instead.')
+                warnings.warn(UserWarning('F-test requires complex '
+                                          'eigencoefficients which '
+                                          'Lomb-Scargle Periodogram does not '
+                                          'provide. Use ``fft`` or ``dft`` '
+                                          'instead.'))
 
         # Uneven sampling case - Fourier Transform
         elif method == 'dft' or method == 'fft':
