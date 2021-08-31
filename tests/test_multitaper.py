@@ -59,37 +59,29 @@ def test_taper_params():
     """
     Validate multitaper parameters.
     """
-    N = 8
     with pytest.raises(ValueError) as err:
-        MultiTaper.validate_taper_params(N=N)
-    assert err.value.args[0] == ('``N`` must be greater than 8.')
+        MultiTaper.validate_taper_params(N=8)
+    assert err.value.args[0] == (r"N must be greater than 8.")
 
-    NW = 0.1
     with pytest.raises(ValueError) as err:
-        MultiTaper.validate_taper_params(NW=NW)
-    assert err.value.args[0] == ('``NW`` must be greater than or equal '
-                                 'to 0.5')
-    NW = 600
-    with pytest.warns(UserWarning, match='NW is greater than 500.'):
-        MultiTaper.validate_taper_params(NW=NW)
+        MultiTaper.validate_taper_params(NW=0.1)
+    assert err.value.args[0] == (r"NW must be greater than or equal "
+                                  "to 0.5.")
+    with pytest.warns(UserWarning, match=r"NW is greater than 500."):
+        MultiTaper.validate_taper_params(NW=600.0)
 
-    K = 0
+    with pytest.warns(UserWarning, match=r"Half-bandwidth parameter W is greater "
+                                          "than 0.5."):
+        MultiTaper.validate_taper_params(N=10, NW=9.5)
+
     with pytest.raises(ValueError) as err:
-        MultiTaper.validate_taper_params(K=K)
-    assert err.value.args[0] == ('``K`` must be greater than or equal to 1')
+        MultiTaper.validate_taper_params(K=0)
+    assert err.value.args[0] == (r"K must be greater than or equal to 1.")
 
-    NW = 4.0
-    K = 12
-    with pytest.warns(UserWarning, match='``K`` is greater than 1.5 + 2NW'):
-        MultiTaper.validate_taper_params(NW=NW, K=K)
+    with pytest.warns(UserWarning, match=r"K is big compared to 2NW."):
+        MultiTaper.validate_taper_params(NW=4.0, K=12)
 
     K = 5.5
-    with pytest.warns(UserWarning, match='K should be an integer value. '
-                                         'Float will be rounded to integer.'):
+    with pytest.warns(UserWarning, match=r"K should be an integer value. "
+                                          "Float will be rounded to integer."):
         MultiTaper.validate_taper_params(K=K)
-
-    N = 10
-    NW = 9.5
-    with pytest.warns(UserWarning, match='Half-bandwidth parameter (W) is '
-                                         'greater than 1/2'):
-        MultiTaper.validate_taper_params(N=N, NW=NW)
