@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 import nfft
 from scipy import interpolate
-from scipy.fft import fft, fftfreq
+from scipy.fft import rfft, rfftfreq, fftfreq
 from scipy.signal.windows import dpss
 from astropy import units as u
 from astropy.timeseries.periodograms import LombScargle
@@ -200,7 +200,7 @@ class MultiTaper():
 
         # Normalisation of tapered data
         tapers = self.tapers.T/np.sum(self.tapers**2, axis=1)
-        tapers *= np.sqrt(self.N)
+        tapers *= np.sqrt(self.delta_t)
         return tapers.T*x
 
     def _pad_tapered_data(self, x_tapered, N_padded):
@@ -240,7 +240,7 @@ class MultiTaper():
                                      (1-eigval_k)*var)
 
             # Spectrum Estimate
-            num = np.mean(np.abs(weights)**2*eigval_k*power_k.T, axis=1)
+            num = np.sum(np.abs(weights)**2*eigval_k*power_k.T, axis=1)
             den = np.sum(np.abs(weights)**2*eigval_k, axis=1)
             spec_curr = num/den
 
@@ -302,23 +302,20 @@ class MultiTaper():
                               '= 1', UserWarning)
 
             # Frequencies
-            freq = fftfreq(self.N_padded, self.delta_t)
+            freq = rfftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
             spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
 
-            # Positive frequencies
-            freq = freq[:self.N_padded//2]
             # Power spectrum estimate
             power_k = np.zeros((self.K, freq.shape[0]))
 
             for ind, x_k in enumerate(self.x_tapered_padded):
                 # Tapered spectrum estimate
-                spec_k[ind] = fft(x_k)
+                spec_k[ind] = rfft(x_k)
 
-            spec_k_real = spec_k[:, :self.N_padded//2]
-            power_k = np.abs(spec_k_real)**2
+            power_k = np.abs(spec_k)**2
+
             # FUTURE: Add a normalisation argument to ``periodogram``
-            power_k *= 1/self.N_padded
 
         # Uneven sampling case - Lomb Scargle
         elif method == 'ls':
@@ -371,7 +368,6 @@ class MultiTaper():
 
             spec_k_real = spec_k[:, self.N_padded//2:]
             power_k = np.abs(spec_k_real)**2
-            power_k *= 1/self.N_padded
         else:
             raise ValueError('``method`` must be one of `dft`, `fft`, `ls`')
 
@@ -467,6 +463,9 @@ class MultiTaper():
          D.J. Thomson and A.D. Chave, “Jackknifed error estimates for spectra,
          coherences, and transfer functions,” 1991.
         """
+        if self.K < 4:
+            raise TypeError('K must be a greater than 3 to ensure a stable '
+                            'jackknife variance estimate.')
 
         taper_inds = np.arange(self.K)
         leave1_est = np.empty_like(power_k)
