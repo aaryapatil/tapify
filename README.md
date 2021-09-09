@@ -1,6 +1,6 @@
 # tapify
 
-![build status](https://github.com/aaryapatil/tapify/actions/workflows/ci.yml/badge.svg)
+[![Build Status](https://github.com/aaryapatil/tapify/actions/workflows/ci.yml/badge.svg)](https://github.com/aaryapatil/tapify/actions)
 
 
 A Multitaper Periodogram package for computing the power spectrum of a
