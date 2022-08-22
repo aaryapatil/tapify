@@ -13,10 +13,14 @@ import warnings
 import numpy as np
 import nfft
 from scipy import interpolate
-from scipy.fft import rfft, rfftfreq, fftfreq
+from scipy.fft import fft, fftfreq
 from scipy.signal.windows import dpss
+from scipy.stats import f
+from statsmodels.stats.multitest import multipletests
 from astropy import units as u
 from astropy.timeseries.periodograms import LombScargle
+
+from .utils import jk_var_helper
 
 
 class MultiTaper():
@@ -108,7 +112,7 @@ class MultiTaper():
             warnings.warn(r'K is big compared to 2NW.', UserWarning)
         if not isinstance(K, int):
             warnings.warn(r'K should be an integer value. Float will be '
-                           'rounded to integer.', UserWarning)
+                          'rounded to integer.', UserWarning)
             K = int(K)
 
         return N, NW, K
@@ -235,19 +239,22 @@ class MultiTaper():
         # Run for maximum ``maxiter`` iterations to obtain adaptive weights
         for _ in range(maxiter):
             # Weighting using local "signal" and broad-band "noise"
-            var = np.std(self.x)**2
-            weights = spec[:, None]/(spec[:, None]*eigval_k +
-                                     (1-eigval_k)*var)
+            var = np.sum(spec, axis=-1) / self.N
+            bband = (1-eigval_k)*var
+            weights = spec[:, None] / (spec[:, None]*eigval_k +
+                                       bband)
 
             # Spectrum Estimate
-            num = np.sum(np.abs(weights)**2*eigval_k*power_k.T, axis=1)
-            den = np.sum(np.abs(weights)**2*eigval_k, axis=1)
-            spec_curr = num/den
+            num = np.sum(np.abs(weights)**2 * eigval_k * power_k.T, axis=1)
+            den = np.sum(np.abs(weights)**2 * eigval_k, axis=1)
+            spec_curr = num / den
 
-            # Check if successive estimates differ by less than 5%
-            error = np.abs((spec_curr-spec)/spec)
-            mean_error = np.mean(error)
-            if mean_error < 0.05:
+            # Compute Eq 5.4 in Thomson 1982 to find the recursive solution
+            cfn = eigval_k[:, None] * (spec_curr[:, None].T - power_k)
+            cfn /= (spec_curr[:, None]*eigval_k + bband).T**2
+            cfn = np.sum(cfn, axis=0)
+            # Heuristic for comparison
+            if np.percentile(cfn**2, 95) < 1e-12:
                 break
             else:
                 spec = spec_curr
@@ -255,8 +262,9 @@ class MultiTaper():
         return spec_curr, weights
 
     def periodogram(self, center_data=True, method='fft', N_padded='default',
-                    nyquist_factor=1, adaptive_weighting=False, maxiter=100,
-                    ftest=False, jackknife=False, plot=False):
+                    nyquist_factor=1, freq=None, adaptive_weighting=False,
+                    maxiter=100, ftest=False, jackknife=False, plot=False,
+                    alpha=0.05):
         """
         Compute the Multitaper Periodogram for even or uneven sampling.
 
@@ -302,37 +310,41 @@ class MultiTaper():
                               '= 1', UserWarning)
 
             # Frequencies
-            freq = rfftfreq(self.N_padded, self.delta_t)
+            freq = fftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
             spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
 
+            # Positive frequencies
+            freq = freq[:self.N_padded//2]
             # Power spectrum estimate
             power_k = np.zeros((self.K, freq.shape[0]))
 
             for ind, x_k in enumerate(self.x_tapered_padded):
                 # Tapered spectrum estimate
-                spec_k[ind] = rfft(x_k)
+                spec_k[ind] = fft(x_k)
 
-            power_k = np.abs(spec_k)**2
-
-            # FUTURE: Add a normalisation argument to ``periodogram``
+            spec_k_pos = spec_k[:, :self.N_padded//2]
+            power_k = np.abs(spec_k_pos)**2
 
         # Uneven sampling case - Lomb Scargle
         elif method == 'ls':
-            freq = LombScargle(self.t, x_tapered[0]).autofrequency(
-                nyquist_factor=nyquist_factor)
+            if freq is None:
+                freq = LombScargle(self.t, x_tapered[0]).autofrequency(
+                    nyquist_factor=nyquist_factor)
             power_k = np.zeros((self.K, freq.shape[0]))
 
             for ind, x_k in enumerate(x_tapered):
                 # Tapered spectrum estimate using fast LS
-                power_k[ind] = LombScargle(self.t, x_k).power(freq,
-                                                              method='fast')
+                power_k[ind] = LombScargle(self.t, x_k).power(
+                    freq, method='fast', normalization='psd')
+            power_k = power_k*self.N
 
             if ftest:
                 ftest = False
-                warnings.warn('F-test requires complex eigencoefficients which '
-                              'Lomb-Scargle Periodogram does not provide. Use '
-                              '``fft`` or ``dft`` instead.', UserWarning)
+                warnings.warn('F-test requires complex eigencoefficients '
+                              'which Lomb-Scargle Periodogram does not '
+                              'provide. Use ``fft`` or ``dft`` instead.',
+                              UserWarning)
 
         # Uneven sampling case - Fourier Transform
         elif method == 'dft' or method == 'fft':
@@ -366,12 +378,13 @@ class MultiTaper():
                 # Maybe rotate this so next step can be :self.N_padded//2
                 spec_k[ind] = fourier_type(t_scaled, x_k, n_freq)
 
-            spec_k_real = spec_k[:, self.N_padded//2:]
-            power_k = np.abs(spec_k_real)**2
+            spec_k_pos = spec_k[:, self.N_padded//2:]
+            power_k = np.abs(spec_k_pos)**2
         else:
             raise ValueError('``method`` must be one of `dft`, `fft`, `ls`')
 
         # Adaptive weighting
+        # ASK: Do we need k eigencoefficients or spectral estimates here
         if adaptive_weighting:
             psd, self.weights = self._adaptive_weights(power_k, self.eigvals,
                                                        maxiter=maxiter)
@@ -381,7 +394,9 @@ class MultiTaper():
 
         if jackknife:
             self.jk_var = self._jackknife_variance(
-                power_k, self.eigvals, adaptive_weighting=adaptive_weighting)
+                spec_k_pos, self.eigvals,
+                adaptive_weighting=adaptive_weighting,
+                ftest_freq=freq, alpha=alpha)
 
         # Convert to quantity is unit is present
         if self.unit:
@@ -389,7 +404,7 @@ class MultiTaper():
             psd = u.Quantity(psd, unit=1/self.unit)
 
         if ftest:
-            fstatistic = self._ftest_helper(spec_k_real)
+            fstatistic = self._ftest_helper(spec_k_pos)
         else:
             fstatistic = None
 
@@ -423,12 +438,17 @@ class MultiTaper():
         else:
             return freq, psd
 
-    def _ftest_helper(self, spec_k):
+    def _ftest_helper(self, spec_k, indices=None):
         """
         Thomson F-test.
         """
+        if indices is not None:
+            K = len(indices)
+        else:
+            K = self.K
+
         # Deal with K = 1 case
-        if self.K == 1:
+        if K == 1:
             raise ValueError('K should be greater than 1 for F-test.')
 
         # Percival and Walden H0
@@ -436,8 +456,11 @@ class MultiTaper():
         Uk0 = np.sum(tapers, axis=1)
 
         # Odd tapers are symmetric and hence their summation goes to 0
-        if(self.K >= 2):
-            Uk0[np.arange(1, self.K, 2)] = 0
+        if(K >= 2):
+            Uk0[np.arange(1, K, 2)] = 0
+
+        if indices is not None:
+            Uk0 = np.take(Uk0, indices, axis=0)
 
         # H0 sum of squares
         Uk0_sum_sq = np.sum(Uk0**2)
@@ -456,7 +479,8 @@ class MultiTaper():
 
         return f_test
 
-    def _jackknife_variance(self, power_k, eigval_k, adaptive_weighting=True):
+    def _jackknife_variance(self, spec_k, eigval_k, adaptive_weighting=True,
+                            ftest_freq=None, alpha=0.05):
         """
         Jackknife variance estimate.
 
@@ -468,34 +492,70 @@ class MultiTaper():
                             'jackknife variance estimate.')
 
         taper_inds = np.arange(self.K)
-        leave1_est = np.empty_like(power_k)
+        leave1_power = np.empty_like(spec_k, dtype='float64')
+        if ftest_freq is not None:
+            leave1_ftest = np.empty_like(spec_k, dtype='float64')
+            self.leave1_f0 = np.zeros(shape=self.K)
+
+        self.leave1_frej = []
+        self.leave1_ftestrej = []
 
         for ind in range(self.K):
-            # Leave-one out multitaper estimate
-            leave1_power_k = np.take(power_k, np.delete(taper_inds, ind),
-                                     axis=0)
-            leave1_eigval_k = np.take(eigval_k, np.delete(taper_inds, ind))
+            # Leave-one out eigencoefficients
+            leave1_inds = np.delete(taper_inds, ind)
+            leave1_spec_k = np.take(spec_k, leave1_inds, axis=0)
+            leave1_eigval_k = np.take(eigval_k, leave1_inds)
 
+            # Convert eigencoefficients to power or tapered spectra
+            leave1_power_k = np.abs(leave1_spec_k)**2
+
+            # leave-one out multitaper estimates
             if adaptive_weighting:
-                leave1_est[ind], _ = self._adaptive_weights(
+                leave1_power[ind], _ = self._adaptive_weights(
                     leave1_power_k, leave1_eigval_k)
             else:
-                leave1_est[ind] = np.mean(leave1_power_k, axis=0)
+                leave1_power[ind] = np.mean(leave1_power_k, axis=0)
 
-        # Logarthim of leave-one out estimates
-        leave1_est = np.log(leave1_est)
-        # Average of the log estimates
-        leave1_avg_est = leave1_est.mean(axis=0)
-        # Average subtracted estimates
-        leave1_centered_est = leave1_est - leave1_avg_est
+            # Leave-one out Ftest estimates
+            if ftest_freq is not None:
+                leave1_ftest[ind] = self._ftest_helper(leave1_spec_k,
+                                                       indices=leave1_inds)
+                p_values = 1 - f.cdf(leave1_ftest[ind], 2, 2*self.K-2)
+                reject, _ = multipletests(p_values, alpha=alpha,
+                                          method='fdr_bh')[:2]
+                self.leave1_frej.append(ftest_freq[reject])
+                self.leave1_ftestrej.append(leave1_ftest[ind][reject])
+                sorted_f = sorted(leave1_ftest[ind])
+                self.leave1_f0[ind] = ftest_freq[np.where(
+                    leave1_ftest[ind] == sorted_f[-1])]
+
+        # Logarthim of leave-one out multitaper estimates
+        leave1_power = np.log(leave1_power)
+        jk_var_power = jk_var_helper(self.K, leave1_power)
 
         # Variance estimate
         # Factor corrected to be not too conservative in
         # D.J. Thomson, “Jackknifing multiple-window spectra,” 1994
-        factor = (self.K - 1)**2/(self.K*(self.K - 1/2))
-        jk_var = factor * np.sum(leave1_centered_est**2, axis=0)
+        jk_var_power *= (self.K - 1)/(self.K - 1/2)
+        return jk_var_power
 
-        return jk_var
+    def f0_jackknife_variance(self, named_freq, rayleigh=1):
+        rayleigh = rayleigh*1/self.t_range
+        freq = self.leave1_frej
+        ftest = self.leave1_ftestrej
+
+        K = len(freq)
+        jk_named_freq = []
+        jk_named_ftest = []
+        for k in range(K):
+            cond = np.where((freq[k] > named_freq - 3*rayleigh)
+                            & (freq[k] < named_freq + 3*rayleigh))
+            if len(cond[0]) > 0:
+                maxf_ind = np.where(ftest[k][cond] == np.max(ftest[k][cond]))
+                jk_named_freq.append(freq[k][cond][maxf_ind])
+                jk_named_ftest.append(ftest[k][cond][maxf_ind])
+        if len(jk_named_freq) > 0:
+            return jk_var_helper(len(jk_named_freq), np.array(jk_named_freq))
 
     def efficiency(self, k=None):
         """

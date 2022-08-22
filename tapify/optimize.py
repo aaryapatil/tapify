@@ -3,7 +3,7 @@ from astropy.timeseries.periodograms import LombScargle
 from scipy import interpolate
 
 from .tapify import MultiTaper
-from .utils import periodogram_even_slow_impl
+from .utils import periodogram_slow
 
 
 def optimum_nw(x, t=None, delta_t=None, nw_vals=None,
@@ -35,8 +35,8 @@ def optimum_nw(x, t=None, delta_t=None, nw_vals=None,
             power_k_m = np.zeros(shape=(K, freq_m.shape[0]))
 
             for ind_f, freq in enumerate(freq_m):
-                power_k_m[:, ind_f] = periodogram_even_slow_impl(x_tapered,
-                                                                 freq)
+                power_k_m[:, ind_f] = periodogram_slow(x_tapered,
+                                                       freq)
         else:
             # Create a grid of frequencies spaced 2W apart
             # NOTE: Cannot handle freq=0 case with LS

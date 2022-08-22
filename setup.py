@@ -21,5 +21,9 @@ setuptools.setup(
         "Operating System :: OS Independent",
         "Intended Audience :: Science/Research"
     ],
-    packages=setuptools.find_packages()
+    packages=setuptools.find_packages(),
+    install_requires=["numpy", "scipy"],
+    extras_require={
+        "extras": ["astropy", "nfft"],
+        "tests": ["pytest"]}
 )
