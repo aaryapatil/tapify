@@ -1,11 +1,8 @@
 # tapify
 
-.. image:: https://github.com/aaryapatil/tapify/workflows/Tests/badge.svg
-    :target: https://github.com/aaryapatil/tapify/actions?query=workflow%3ATests
-.. image:: http://img.shields.io/badge/license-MIT-blue.svg?style=flat
-    :target: https://github.com/aaryapatil/tapify/blob/main/LICENSE
-.. image:: https://readthedocs.org/projects/tapify/badge/?version=latest
-    :target: http://tapify.readthedocs.io/en/latest/?badge=latest
+[![Build Status](https://github.com/aaryapatil/tapify/workflows/Tests/badge.svg)](https://github.com/aaryapatil/tapify/actions)
+[![License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/aaryapatil/tapify/blob/main/LICENSE)
+[![Docs](https://readthedocs.org/projects/tapify/badge/?version=latest)](http://tapify.readthedocs.io/en/latest/?badge=latest)
 
 A Multitaper Periodogram package for computing the power spectrum of a
 time-series with minimal spectral leakage and reduced variance.
