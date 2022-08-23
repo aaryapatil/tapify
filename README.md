@@ -1,6 +1,6 @@
 # tapify
 
-[![Logo](https://github.com/aaryapatil/tapify/docs/images/tapify_logo.png)](https://github.com/aaryapatil/tapify)
+[![Logo](https://github.com/aaryapatil/tapify/blob/main/docs/images/tapify_logo.png)](https://github.com/aaryapatil/tapify)
 
 [![Build Status](https://github.com/aaryapatil/tapify/workflows/Tests/badge.svg)](https://github.com/aaryapatil/tapify/actions)
 [![License](http://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/aaryapatil/tapify/blob/main/LICENSE)
