@@ -19,5 +19,5 @@ Read the documentation at [tapify.readthedocs.io](https://tapify.readthedocs.io/
 
 # Attribution
 
-Please cite `Patil, Eadie, Speagle, Thomson (2022), in prep.` if you use this code
+Please cite `Patil, Eadie, Speagle, Thomson (2022) https://arxiv.org/abs/2209.15027` if you use this code
 in your research.
