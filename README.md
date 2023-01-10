@@ -12,6 +12,17 @@ time-series with minimal spectral leakage and reduced variance.
 # Documentation
 Read the documentation at [tapify.readthedocs.io](https://tapify.readthedocs.io/)
 
+The following is a basic use case to get you started:
+
+```
+from tapify import MultiTaper
+
+mt_object = MultiTaper(data, t=time, NW=4, K=7)
+freq, power = mt_object.periodogram(method='fft',
+                                    adaptive_weighting=True,
+                                    N_padded='default')
+```
+
 # Installation
 ``pip install tapify``
 
