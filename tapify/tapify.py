@@ -264,7 +264,7 @@ class MultiTaper():
     def periodogram(self, center_data=True, method='fft', N_padded='default',
                     nyquist_factor=1, freq=None, adaptive_weighting=False,
                     maxiter=100, ftest=False, jackknife=False, plot=False,
-                    alpha=0.05):
+                    alpha=0.05,show_mu_f =False):
         """
         Compute the Multitaper Periodogram for even or uneven sampling.
 
@@ -312,7 +312,7 @@ class MultiTaper():
             # Frequencies
             freq = fftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
-            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
+            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex128)
 
             # Positive frequencies
             freq = freq[:self.N_padded//2]
@@ -351,7 +351,7 @@ class MultiTaper():
             # Frequencies
             freq = fftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
-            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
+            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex128)
 
             # Positive frequencies
             freq = freq[:self.N_padded//2]
@@ -404,7 +404,10 @@ class MultiTaper():
             psd = u.Quantity(psd, unit=1/self.unit)
 
         if ftest:
-            fstatistic = self._ftest_helper(spec_k_pos)
+            if show_mu_f:
+                fstatistic, mu_f = self._ftest_helper(spec_k_pos, show_mu_f=True)
+            else:
+                fstatistic = self._ftest_helper(spec_k_pos)
         else:
             fstatistic = None
 
@@ -434,11 +437,14 @@ class MultiTaper():
         self.fstatistic = fstatistic
 
         if ftest:
-            return freq, psd, fstatistic
+            if show_mu_f:
+                return freq, psd, fstatistic, mu_f
+            else:
+                return freq, psd, fstatistic
         else:
             return freq, psd
 
-    def _ftest_helper(self, spec_k, indices=None):
+    def _ftest_helper(self, spec_k, indices=None, show_mu_f=False):
         """
         Thomson F-test.
         """
@@ -476,8 +482,11 @@ class MultiTaper():
 
         # k-1 degrees of freedom
         f_test = (self.K-1)*sig_var/noise_var
-
-        return f_test
+        
+        if show_mu_f:
+            return f_test, mu_f
+        else:
+            return f_test
 
     def _jackknife_variance(self, spec_k, eigval_k, adaptive_weighting=True,
                             ftest_freq=None, alpha=0.05):
@@ -585,3 +594,15 @@ class MultiTaper():
             self.v = 2*np.sum(np.abs(self.weights[:, :k])**2, axis=1)
             self.v_avg = np.mean(self.v)/(2*k)
             self.overall_eff = self.v_avg*self.var_eff*self.N
+    
+    def find_Uk_f(self):
+    
+        # Scale for nfft (not padded)
+        t_scaled_np = (self.t - self.t[0])/self.t_range - 0.5
+        
+        for ind, x_k in enumerate(self.tapers):
+            Uk_f[ind] = nfft.ndft_adjoint(t_scaled_np, x_k, self.N)
+            
+        return Uk_f
+        
+        
