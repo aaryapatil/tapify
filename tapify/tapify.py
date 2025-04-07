@@ -312,7 +312,7 @@ class MultiTaper():
             # Frequencies
             freq = fftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
-            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
+            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex128)
 
             # Positive frequencies
             freq = freq[:self.N_padded//2]
@@ -351,7 +351,7 @@ class MultiTaper():
             # Frequencies
             freq = fftfreq(self.N_padded, self.delta_t)
             # Eigenspectra
-            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex_)
+            spec_k = np.zeros(shape=(self.K, len(freq)), dtype=np.complex128)
 
             # Positive frequencies
             freq = freq[:self.N_padded//2]
@@ -476,6 +476,8 @@ class MultiTaper():
 
         # k-1 degrees of freedom
         f_test = (self.K-1)*sig_var/noise_var
+
+        self.mu_f = mu_f
 
         return f_test
 
