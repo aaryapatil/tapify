@@ -473,6 +473,8 @@ class MultiTaper():
 
         # Mean estimate of the amplitude of the periodic signal
         num = np.sum(Uk0[:, None]*spec_k, axis=0)
+        
+        
         mu_f = num/Uk0_sum_sq
 
         # Variance explained the periodic signal in the data
