@@ -438,7 +438,7 @@ class MultiTaper():
 
         if ftest:
             if show_mu_f:
-                return freq, psd, fstatistic, mu_f
+                return freq, psd, fstatistic, mu_f, [spec_k, spec_k_pos, t_scaled, n_freq]
             else:
                 return freq, psd, fstatistic
         else:
