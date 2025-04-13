@@ -596,12 +596,24 @@ class MultiTaper():
             self.overall_eff = self.v_avg*self.var_eff*self.N
     
     def find_Uk_f(self):
+    """
+    Ideally this should return the Fourier transform of the tapers, 
+    or the Discrete Prolate Spheroidal wavefunctions
+    if you have sufficient computational power
+    """
     
+        Uk_f = [[] for _ in range(3)]
+        
         # Scale for nfft (not padded)
         t_scaled_np = (self.t - self.t[0])/self.t_range - 0.5
         
+        if self.N % 2:
+            n_freq = self.N - 1
+        else:
+            n_freq = self.N
+        
         for ind, x_k in enumerate(self.tapers):
-            Uk_f[ind] = nfft.ndft_adjoint(t_scaled_np, x_k, self.N)
+            Uk_f[ind] = nfft.ndft_adjoint(t_scaled_np, x_k, n_freq)
             
         return Uk_f
         
