@@ -30,5 +30,5 @@ freq, power = mt_object.periodogram(method='fft',
 
 # Attribution
 
-Please cite `Patil, Eadie, Speagle, Thomson (2022) https://arxiv.org/abs/2209.15027` if you use this code
+Please cite Patil, Eadie, Speagle, Thomson (2024) https://iopscience.iop.org/article/10.3847/1538-3881/ad7029' if you use this code
 in your research.
